@@ -2,7 +2,7 @@
 :- ensure_loaded('files.pl').
 
 
-
+%% TODO
 % tile/2
 % tile(Index, Tile)
 %
@@ -27,7 +27,6 @@
 % celorlalte predicate din temă, pentru a întreba, de exemplu, ce se
 % află pe muchia de nord a piesei 1, sau dacă piesa 1 se potrivește cu o
 % altă piesă.
-
 % make representation for each tile based on index 
 % 1 - 16 N-E-S-W
 % tile/2
@@ -51,6 +50,7 @@ tile(16, T16) :- T16 = tile(16, [d, d, d, d]). % tile 16 has 4 roads
 
 
 
+%% TODO
 % at/3
 % at(+Tile, +Direction, ?What)
 %
@@ -69,7 +69,6 @@ tile(16, T16) :- T16 = tile(16, [d, d, d, d]). % tile 16 has 4 roads
 %
 % Dacă What nu este legat, trebuie legat la entitatea care se află pe
 % muchia din direcția Dir.
-
 % at/3
 % at(+Tile, +Direction, ?What)
 at(tile(_, [Var, _, _, _]), n, c) :- member(Var, [c1, c2]), !.
@@ -83,6 +82,8 @@ at(tile(_, [_, _, Var, _]), s, Var). % check to see value at south
 at(tile(_, [_, _, _, Var]), w, Var). % check to see value at west
 
 
+
+%% TODO
 % atL/3
 % atL(+Tile, +Directions, +What)
 %
@@ -108,8 +109,11 @@ atL(Tile, [CurrDirection | Rest], What) :-
     atL(Tile, Rest, What). % check for the rest of the directions
 
 
+
+%% TODO
 % hasTwoCitadels/1
 % hasTwoCitadels(+Tile)
+%
 % Predicatul întoarce adevărat dacă pe piesă există două cetăți diferite
 % (ca în piesele 4 și 5).
 hasTwoCitadels(tile(_, Entities)) :-
@@ -118,6 +122,8 @@ hasTwoCitadels(tile(_, Entities)) :-
     c1 \= c2. % check to see if c1 is different than c2
 
 
+
+%% TODO
 % ccw/3
 % ccw(+Tile, +Rotation, -RotatedTile)
 % Predicatul este adevărat dacă RotatedTile este reprezentarea piesei cu
@@ -134,8 +140,6 @@ hasTwoCitadels(tile(_, Entities)) :-
 % Rotation=1 și Rotation=3 vor fi identice.
 % La piesa 16, orice rotire trebuie să aibă aceeași reprezentare cu
 % reprezentarea inițială.
-
-% helper function that rotates a list once to the left
 
 % append/3 
 % append(+List1, +List2, -List1AndList2)
@@ -157,6 +161,7 @@ ccw(tile(Index, List), NumberOfRotations, tile(Index, RotatedList)) :-
 
 
 
+%% TODO
 % rotations/2
 % rotations(+Tile, -RotationPairs)
 %
@@ -213,6 +218,9 @@ rotations(Tile, RotationPairs) :-
     find_rotations(Tile, 0, [], RotationPairs). % call the helper function with the initial number of rotations 0, the initial list [], and the result list RotationPairs
 
 
+
+
+%% TODO
 % match/3
 % match(+Tile, +NeighborTile, +NeighborDirection)
 %
@@ -237,6 +245,8 @@ match(Tile, NeighborTile, NeighborDirection) :-
 
 
 
+
+%% TODO
 % findRotation/3
 % findRotation(+Tile, +Neighbors, -Rotation)
 %
@@ -274,6 +284,254 @@ findRotation(Tile, Neighbors, NumberOfRotations) :-
     rotations(Tile, RotationPairs), % get all the rotations of the tile
     member((NumberOfRotations, RotatedTile), RotationPairs), % check if the pair (NumberOfRotations, RotatedTile) is in the list of rotations
     matches_all_neighbors(RotatedTile, Neighbors, NumberOfRotations). % check if the rotated tile matches all the neighbors
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Etapa 2
+
+
+%% TODO
+% define an empty tile
+emptyTile(ET) :- ET = tile([]). 
+
+
+% helper to create a list with N copies of X
+repeat(X, N, List) :-
+    length(List, N),
+    maplist(=(X), List).
+
+% emptyBoard/1
+% emptyBoard(-Board)
+% emptyBoard(Board) :-
+%     emptyTile(E),
+%     repeat(E, 4, Row), % create an empty row
+%     repeat(Row, 4, Board). % create the board with 8 rows  
+
+emptyBoard([]).
+
+
+
+
+%% TODO
+% boardSet/4
+% boardSet(+BoardIn, +Pos, +Tile, -BoardOut)
+%
+% Predicatul întoarce false dacă se încearcă plasarea unei piese pe o
+% poziție pe care este deja o piesă, pe o poziție fără muchie comună
+% cu o piesă existentă, sau într-un loc unde piesa nu se potrivește cu
+% vecinii săi.
+%
+% Pentru o tablă goală, predicatul reușește întotdeauna, și poziția Pos
+% devine singura de pe tablă.
+%
+% Poziția este dată ca un tuplu (X, Y).
+
+% boardSet/4
+% boardSet(+BoardIn, +Pos, +Tile, -BoardOut)
+boardSet(emptyBoard, Pos, Tile, [(Pos, Tile)]).
+boardSet(BoardIn, Pos, Tile, BoardOut) :-
+    \+ member((Pos, _), BoardIn), % check if the position is not already occupied
+    placeTile(BoardIn, Pos, Tile, BoardOut), % place the tile on the board
+    validPlacement(BoardOut, Tile, _). % check if the tile is placed in a valid position
+
+% validPlacement/3
+% validPlacement(+BoardIn, +Tile, -Neighbors)
+validPlacement(BoardIn, Tile, Neighbors) :- 
+    findall((NeighborTile, NeighborDirection), (at(Tile, NeighborDirection, What), at(NeighborTile, OppositeDirection, What)), Neighbors), % get all the neighbors of the tile
+    findRotation(Tile, Neighbors, _). % check if there is a rotation of the tile that matches all the neighbors
+   
+
+% placeTile/4
+% placeTile(+BoardIn, +Pos, +Tile, -BoardOut)
+placeTile(BoardIn, Pos, Tile, [(Pos, Tile)|BoardIn]).
+
+% findall/3
+% findall(+Template, +Goal, -Bag)
+% findall/3 is true when Bag is the list of all instances of Template that make Goal provable.
+
+%% TODO
+% boardGet/3
+% boardGet(+Board, +Pos, -Tile)
+%
+% Predicatul leagă Tile la reprezentarea piesei de pe tabla Board, de la
+% poziția Pos. Poziția este dată ca un tuplu (X, Y).
+%
+% Dacă la poziția Pos nu este nicio piesă, predicatul eșuează.
+boardGet(Board, (X, Y), Tile) :-
+    getTile(Board, (X, Y), Tile).
+
+getTile([(Pos, Tile)|_], Pos, Tile).
+getTile([_|Rest], Pos, Tile) :-
+    getTile(Rest, Pos, Tile).
+
+
+
+%% TODO
+% boardGetLimits/5
+% boardGetLimits(+Board, -XMin, -Ymin, -XMax, -YMax)
+%
+% Predicatul leagă cele 4 argumente la coordonatele x-y extreme la
+% care există piese pe tablă.
+%
+% Pentru o tablă goală, predicatul eșuează.
+%
+% Hint: max_list/2 și min_list/2
+boardGetLimits(Board, XMin, YMin, XMax, YMax) :-
+    findall(X, (boardGet(Board, (X, _), _)), Xs), % get all the Xs
+    findall(Y, (boardGet(Board, (_, Y), _)), Ys), % get all the Ys
+    max_list(Xs, XMax), % get the max X
+    min_list(Xs, XMin), % get the min X
+    max_list(Ys, YMax), % get the max Y
+    min_list(Ys, YMin). % get the min Y
+
+
+%% TODO
+% canPlaceTile/3
+% canPlaceTile(+Board, +Pos, +Tile)
+%
+% Întoarce adevărat dacă este o mișcare validă plasarea piese Tile la
+% poziția Pos pe tabla Board. Poziția este dată ca un tuplu (X, Y).
+%
+% O mișcare este validă dacă tabla este goală sau dacă:
+% - poziția este liberă;
+% - poziția este adiacentă (are o muchie comună) cu o piesă deja
+% existentă pe tablă;
+% - piesa se potrivește cu toți vecinii deja existenți pe tablă.
+%
+% Hint: neighbor/3 și directions/1 , ambele din utils.pl
+canPlaceTile(emptyBoard, _, _).
+canPlaceTile(Board, Pos, Tile) :-
+    \+ member((Pos, _), Board),       % position must be empty
+    isAdjacentToExistingTile(Board, Pos),          % position is adjacent to a placed tile
+    fitsWithNeighbors(Board, Pos, Tile).           % the tile fits with the neighboring tiles
+
+
+fitsWithNeighbors(Board, Pos, Tile) :-
+    % Get the neighbors of the position.
+    boardGetNeighbors(Board, Pos, Neighbors),
+    % Find a rotation of the tile that matches all neighbors.
+    findRotation(Tile, Neighbors, _).
+
+
+isAdjacentToExistingTile(Board, (X, Y)) :-
+    X1 is X + 1,
+    X2 is X - 1,
+    Y1 is Y + 1,
+    Y2 is Y - 1,
+    (   getTile(Board, (X1, Y), _)
+    ;   getTile(Board, (X2, Y), _)
+    ;   getTile(Board, (X, Y1), _)
+    ;   getTile(Board, (X, Y2), _)
+    ).
+
+% Define the directions in which we can find neighbors. We'll use this in boardGetNeighbors.
+direction((X, Y), north, (X, Y1)) :- Y1 is Y + 1.
+direction((X, Y), east, (X1, Y)) :- X1 is X + 1.
+direction((X, Y), south, (X, Y1)) :- Y1 is Y - 1.
+direction((X, Y), west, (X1, Y)) :- X1 is X - 1.
+
+% Helper predicate to find a tile at a specific position in the board.
+findTile([(P, T)|_], P, T) :- !.
+findTile([_|Rest], P, T) :-
+    findTile(Rest, P, T).
+
+% Main predicate.
+boardGetNeighbors(Board, Pos, Neighbors) :-
+    findall(
+        % What we're collecting: tuples of the form (NeighborTile, Direction).
+        (NeighborTile, Direction),
+        % Where we're collecting from: all directions.
+        (   
+            direction(Pos, Direction, NeighborPos),
+            findTile(Board, NeighborPos, NeighborTile)
+        ),
+        % Where we're putting the results.
+        Neighbors
+    ).
+
+%% TODO
+% getAvailablePositions/2
+% getAvailablePositions(+Board, -Positions)
+%
+% Predicatul leagă Positions la o listă de perechi (X, Y)
+% a tuturor pozițiilor de pe tabla Board unde se pot pune piese (poziții
+% libere vecine pe o muchie cu piese existente pe tablă).
+%
+% Pentru o tablă goală, predicatul eșuează.
+%
+% Hint: between/3 (predefinit) și neighbor/3 din utils.pl
+%
+% Atenție! Și în afara limitelor curente există poziții disponibile.
+% Helper predicate to get all adjacent positions to a given one.
+adjacentPositions((X, Y), [(X1, Y), (X, Y1), (X2, Y), (X, Y2)]) :-
+    X1 is X + 1,
+    Y1 is Y + 1,
+    X2 is X - 1,
+    Y2 is Y - 1.
+
+% Helper predicate to check if a position is already occupied on the board.
+isOccupied(Board, Pos) :-
+    member((Pos, _), Board).
+
+% Helper predicate to get all occupied positions on the board.
+occupiedPositions(Board, Occupied) :-
+    findall(
+        Pos,
+        member((Pos, _), Board),
+        Occupied
+    ).
+
+% Main predicate.
+getAvailablePositions(emptyBoard, _) :- false.
+getAvailablePositions(Board, Available) :-
+    occupiedPositions(Board, Occupied),
+    findall(
+        Adjacent,
+        (
+            member(Pos, Occupied),
+            adjacentPositions(Pos, AdjacentPos),
+            member(Adjacent, AdjacentPos),
+            \+ isOccupied(Board, Adjacent)
+        ),
+        Duplicates
+    ),
+    list_to_set(Duplicates, Available).
+
+
+
+%% TODO
+% findPositionForTile/4
+% findPositionForTile(+Board, +Tile, -Position, -Rotation)
+%
+% Predicatul are ca soluții toate posibilele plasări pe tabla Board ale
+% piesei Tile, legând Position la o pereche (X, Y) care reprezintă
+% poziția și Rotation la un număr între 0 și 3 inclusiv, reprezentând de
+% câte ori trebuie rotită piesa ca să se potrivească.
+%
+% Unele piese se pot potrivi cu mai multe rotații pe aceeași poziție și
+% acestea reprezintă soluții diferite ale predicatului, dar numai dacă
+% rotațiile duc la rezultate diferite.
+%
+% Dacă tabla este goală, predicatul leagă Position la (0, 0) și Rotation
+% la 0.
+%
+% De exemplu, dacă pe tablă se află doar piesa 11, la vest de ea piesa 9
+% se potrivește cu rotația 1 sau 2 - două soluții diferite. Pentru
+% plasarea la vest de piesa 11 a piesei 16 însă există o singură soluție
+% - rotație 0.
+%
+% În ieșirea de la teste, rezultatele vor fi asamblate ca
+% (X,Y):Rotation.
+findPositionForTile(emptyBoard, _, (0,0), 0).
+findPositionForTile(Board, Tile, Position, Rotation) :-
+    getAvailablePositions(Board, Positions),       % Get all available positions on the board
+    member(Position, Positions),                   % Iterate over each position
+    canPlaceTile(Board, Position, Tile),           % Check if you can place the tile on the board at the current position
+    boardGetNeighbors(Board, Position, Neighbors), % Get all neighbors of the current position
+    findRotation(Tile, Neighbors, Rotation).       % Find the rotation for the tile that matches with all neighbors
+
+
+
 
 
 
