@@ -291,22 +291,12 @@ findRotation(Tile, Neighbors, NumberOfRotations) :-
 
 
 %% TODO
-% define an empty tile
-emptyTile(ET) :- ET = tile([]). 
-
-
-% helper to create a list with N copies of X
-repeat(X, N, List) :-
-    length(List, N),
-    maplist(=(X), List).
-
 % emptyBoard/1
 % emptyBoard(-Board)
 % emptyBoard(Board) :-
 %     emptyTile(E),
 %     repeat(E, 4, Row), % create an empty row
 %     repeat(Row, 4, Board). % create the board with 8 rows  
-
 emptyBoard([]).
 
 
@@ -331,19 +321,12 @@ emptyBoard([]).
 boardSet(emptyBoard, Pos, Tile, [(Pos, Tile)]).
 boardSet(BoardIn, Pos, Tile, BoardOut) :-
     \+ member((Pos, _), BoardIn), % check if the position is not already occupied
-    placeTile(BoardIn, Pos, Tile, BoardOut), % place the tile on the board
-    validPlacement(BoardOut, Tile, _). % check if the tile is placed in a valid position
-
-% validPlacement/3
-% validPlacement(+BoardIn, +Tile, -Neighbors)
-validPlacement(BoardIn, Tile, Neighbors) :- 
-    findall((NeighborTile, NeighborDirection), (at(Tile, NeighborDirection, What), at(NeighborTile, OppositeDirection, What)), Neighbors), % get all the neighbors of the tile
-    findRotation(Tile, Neighbors, _). % check if there is a rotation of the tile that matches all the neighbors
-   
+    fitsWithNeighbors(BoardIn, Pos, Tile), % check if the tile fits with the neighbors
+    placeTile(BoardIn, Pos, Tile, BoardOut). % place the tile on the board
 
 % placeTile/4
 % placeTile(+BoardIn, +Pos, +Tile, -BoardOut)
-placeTile(BoardIn, Pos, Tile, [(Pos, Tile)|BoardIn]).
+placeTile(BoardIn, Pos, Tile, [(Pos, Tile) | BoardIn]).
 
 % findall/3
 % findall(+Template, +Goal, -Bag)
@@ -357,13 +340,11 @@ placeTile(BoardIn, Pos, Tile, [(Pos, Tile)|BoardIn]).
 % poziția Pos. Poziția este dată ca un tuplu (X, Y).
 %
 % Dacă la poziția Pos nu este nicio piesă, predicatul eșuează.
-boardGet(Board, (X, Y), Tile) :-
-    getTile(Board, (X, Y), Tile).
-
-getTile([(Pos, Tile)|_], Pos, Tile).
-getTile([_|Rest], Pos, Tile) :-
-    getTile(Rest, Pos, Tile).
-
+% boardGet/3
+% boardGet(+Board, +Pos, -Tile)
+boardGet([(Pos, Tile) | _], Pos, Tile). % base case
+boardGet([_ | Rest], Pos, Tile) :- 
+    boardGet(Rest, Pos, Tile). % call the function again with the rest of the board
 
 
 %% TODO
@@ -399,54 +380,39 @@ boardGetLimits(Board, XMin, YMin, XMax, YMax) :-
 % - piesa se potrivește cu toți vecinii deja existenți pe tablă.
 %
 % Hint: neighbor/3 și directions/1 , ambele din utils.pl
+
 canPlaceTile(emptyBoard, _, _).
 canPlaceTile(Board, Pos, Tile) :-
-    \+ member((Pos, _), Board),       % position must be empty
-    isAdjacentToExistingTile(Board, Pos),          % position is adjacent to a placed tile
-    fitsWithNeighbors(Board, Pos, Tile).           % the tile fits with the neighboring tiles
+    \+ member((Pos, _), Board), % check if the position is not already occupied
+    getAvailablePositions(Board, AvailablePositions), % get all the available positions
+    member(Pos, AvailablePositions), % check if the position is available
+    fitsWithNeighbors(Board, Pos, Tile). % check if the tile fits with the neighbors
 
 
+% fitsWithNeighbors/3
+% fitsWithNeighbors(+Board, +Pos, +Tile)
 fitsWithNeighbors(Board, Pos, Tile) :-
-    % Get the neighbors of the position.
-    boardGetNeighbors(Board, Pos, Neighbors),
-    % Find a rotation of the tile that matches all neighbors.
-    findRotation(Tile, Neighbors, _).
+    boardGetNeighbors(Board, Pos, Neighbors), % get all the neighbors of the position
+    forall(member((NeighborTile, Direction), Neighbors), match(Tile, NeighborTile, Direction)). % check if the tile matches with all the neighbors
 
-
-isAdjacentToExistingTile(Board, (X, Y)) :-
-    X1 is X + 1,
-    X2 is X - 1,
-    Y1 is Y + 1,
-    Y2 is Y - 1,
-    (   getTile(Board, (X1, Y), _)
-    ;   getTile(Board, (X2, Y), _)
-    ;   getTile(Board, (X, Y1), _)
-    ;   getTile(Board, (X, Y2), _)
-    ).
 
 % Define the directions in which we can find neighbors. We'll use this in boardGetNeighbors.
-direction((X, Y), north, (X, Y1)) :- Y1 is Y + 1.
-direction((X, Y), east, (X1, Y)) :- X1 is X + 1.
-direction((X, Y), south, (X, Y1)) :- Y1 is Y - 1.
-direction((X, Y), west, (X1, Y)) :- X1 is X - 1.
+% directions/3
+% directions(+Pos, -Direction, -NeighborPos)
+direction((X, Y), n, (X, Y1)) :- Y1 is Y + 1. % north
+direction((X, Y), e, (X1, Y)) :- X1 is X + 1. % east
+direction((X, Y), s, (X, Y1)) :- Y1 is Y - 1. % south
+direction((X, Y), w, (X1, Y)) :- X1 is X - 1. % west
 
-% Helper predicate to find a tile at a specific position in the board.
-findTile([(P, T)|_], P, T) :- !.
-findTile([_|Rest], P, T) :-
-    findTile(Rest, P, T).
-
-% Main predicate.
+% boardGetNeighbors/3
+% boardGetNeighbors(+Board, +Pos, -Neighbors)
 boardGetNeighbors(Board, Pos, Neighbors) :-
-    findall(
-        % What we're collecting: tuples of the form (NeighborTile, Direction).
-        (NeighborTile, Direction),
-        % Where we're collecting from: all directions.
+    findall((NeighborTile, Direction), % pairs of (neighbor tile, direction)
         (   
-            direction(Pos, Direction, NeighborPos),
-            findTile(Board, NeighborPos, NeighborTile)
+            direction(Pos, Direction, NeighborPos), % get the position of the neighbor
+            boardGet(Board, NeighborPos, NeighborTile) % get the tile at the neighbor position
         ),
-        % Where we're putting the results.
-        Neighbors
+        Neighbors % store it in Neighbors
     ).
 
 %% TODO
@@ -462,40 +428,39 @@ boardGetNeighbors(Board, Pos, Neighbors) :-
 % Hint: between/3 (predefinit) și neighbor/3 din utils.pl
 %
 % Atenție! Și în afara limitelor curente există poziții disponibile.
+
 % Helper predicate to get all adjacent positions to a given one.
 adjacentPositions((X, Y), [(X1, Y), (X, Y1), (X2, Y), (X, Y2)]) :-
-    X1 is X + 1,
-    Y1 is Y + 1,
-    X2 is X - 1,
-    Y2 is Y - 1.
+    X1 is X + 1, % +1 to east
+    Y1 is Y + 1, % +1 to north
+    X2 is X - 1, % -1 to west
+    Y2 is Y - 1. % -1 to south
 
 % Helper predicate to check if a position is already occupied on the board.
+% isOccupied/2
+% isOccupied(+Board, +Pos)
 isOccupied(Board, Pos) :-
     member((Pos, _), Board).
 
 % Helper predicate to get all occupied positions on the board.
 occupiedPositions(Board, Occupied) :-
-    findall(
-        Pos,
-        member((Pos, _), Board),
-        Occupied
-    ).
+    findall(Pos, member((Pos, _), Board), Occupied). % get all the occupied positions
 
-% Main predicate.
+% Helper predicate to check if a position is adjacent to an occupied position and is free.
+% adjacentAndFree/3
+% adjacentAndFree(+Board, +Pos, -Adjacent)
+adjacentAndFree(Board, Pos, Adjacent) :-
+    adjacentPositions(Pos, AdjacentPos), % get all the adjacent positions
+    member(Adjacent, AdjacentPos), % get an adjacent position
+    \+ isOccupied(Board, Adjacent). % check if the position is not occupied
+
+% Refactored main predicate.
 getAvailablePositions(emptyBoard, _) :- false.
 getAvailablePositions(Board, Available) :-
-    occupiedPositions(Board, Occupied),
-    findall(
-        Adjacent,
-        (
-            member(Pos, Occupied),
-            adjacentPositions(Pos, AdjacentPos),
-            member(Adjacent, AdjacentPos),
-            \+ isOccupied(Board, Adjacent)
-        ),
-        Duplicates
-    ),
-    list_to_set(Duplicates, Available).
+    \+ emptyBoard(Board), % check if the board is not empty
+    occupiedPositions(Board, Occupied), % get all the occupied positions
+    findall(Adjacent, (member(Pos, Occupied), adjacentAndFree(Board, Pos, Adjacent)), AvailablePositionsWithDuplicates), % get all the adjacent and free positions
+    list_to_set(AvailablePositionsWithDuplicates, Available). % remove duplicates
 
 
 
@@ -522,13 +487,19 @@ getAvailablePositions(Board, Available) :-
 %
 % În ieșirea de la teste, rezultatele vor fi asamblate ca
 % (X,Y):Rotation.
-findPositionForTile(emptyBoard, _, (0,0), 0).
+
+% findPositionForTile(emptyBoard, _, (0,0), 0).
 findPositionForTile(Board, Tile, Position, Rotation) :-
-    getAvailablePositions(Board, Positions),       % Get all available positions on the board
-    member(Position, Positions),                   % Iterate over each position
-    canPlaceTile(Board, Position, Tile),           % Check if you can place the tile on the board at the current position
-    boardGetNeighbors(Board, Position, Neighbors), % Get all neighbors of the current position
-    findRotation(Tile, Neighbors, Rotation).       % Find the rotation for the tile that matches with all neighbors
+    (emptyBoard(Board) -> 
+        Position = (0,0), Rotation = 0 % if the board is empty, the position is (0,0) and the rotation is 0
+    ;
+        getAvailablePositions(Board, AvailablePositions), % get all the available positions
+        member(Position, AvailablePositions), % check if the position is available
+        rotations(Tile, Rotations), % get all the rotations of the tile
+        member((Rotation, RotatedTile), Rotations), % get a rotation of the tile
+        fitsWithNeighbors(Board, Position, RotatedTile) % check if the tile fits with the neighbors
+    ).
+
 
 
 
